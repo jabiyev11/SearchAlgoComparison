@@ -2,288 +2,704 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Search Algorithm Comparison</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Algorithm Comparison — Baku vs Tbilisi</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #1a1a2e; color: white; height: 100vh; display: flex; flex-direction: column; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; }
 
-        header {
-            background: #16213e;
-            padding: 12px 20px;
+        /* Top control bar */
+        .topbar {
             display: flex;
             align-items: center;
-            gap: 20px;
-            border-bottom: 2px solid #0f3460;
-        }
-        header h1 { font-size: 18px; color: #e94560; }
-
-        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        select, button {
-            padding: 7px 14px;
-            border-radius: 6px;
-            border: none;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        select { background: #0f3460; color: white; }
-        #btnRun {
-            background: #e94560;
+            justify-content: center;
+            gap: 25px;
+            padding: 12px 30px;
+            background: #16213e;
             color: white;
-            font-weight: bold;
-            opacity: 0.5;
-            pointer-events: none;
+            flex-wrap: nowrap;
         }
-        #btnRun.ready { opacity: 1; pointer-events: all; }
-        #btnClear { background: #444; color: white; }
 
-        .instruction {
-            font-size: 13px;
-            color: #aaa;
-            background: #0f3460;
-            padding: 5px 12px;
+        .topbar h1 { font-size: 17px; font-weight: 700; margin-right: 5px; }
+        .topbar label { font-size: 13px; color: #aaa; margin-right: 4px; }
+
+        .topbar select, .topbar button {
+            padding: 6px 12px;
             border-radius: 6px;
+            border: 1px solid #333;
+            font-size: 13px;
+            background: #0f3460;
+            color: white;
+            outline: none;
         }
 
+        /* Tab buttons */
+        .tab-group { display: flex; gap: 2px; }
+        .tab-btn {
+            padding: 7px 16px !important;
+            cursor: pointer;
+            border: none !important;
+            background: #0a1628 !important;
+            color: #888 !important;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .tab-btn:first-child { border-radius: 6px 0 0 6px !important; }
+        .tab-btn:last-child  { border-radius: 0 6px 6px 0 !important; }
+        .tab-btn.active { background: #0f3460 !important; color: white !important; }
+
+        .btn-run {
+            background: #27ae60 !important; border: none !important;
+            cursor: pointer; font-weight: 600; padding: 8px 20px !important; transition: background 0.2s;
+        }
+        .btn-run:hover { background: #2ecc71 !important; }
+        .btn-run:disabled { background: #555 !important; cursor: not-allowed; }
+
+        .btn-clear {
+            background: #e74c3c !important; border: none !important;
+            cursor: pointer; font-weight: 600; transition: background 0.2s;
+        }
+        .btn-clear:hover { background: #c0392b !important; }
+
+        .speed-group { display: flex; align-items: center; gap: 6px; }
+        .speed-group input[type="range"] { width: 80px; accent-color: #4a90d9; }
+        .speed-text { font-size: 11px; color: #888; min-width: 45px; }
+        .status-text { font-size: 13px; color: #e67e22; min-width: 120px; text-align: center; }
+        .status-text.done { color: #27ae60; }
+
+        /* ==================== LIVE DEMO VIEW ==================== */
         .maps-container {
             display: flex;
-            flex: 1;
-            gap: 4px;
-            padding: 4px;
+            height: calc(100vh - 50px);
         }
 
-        .map-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            border-radius: 8px;
-            overflow: hidden;
+        .map-panel { flex: 1; position: relative; border-right: 2px solid #1a1a2e; }
+        .map-panel:last-child { border-right: none; }
+        .map-panel .map { width: 100%; height: 100%; }
+
+        .algo-label {
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; padding: 8px 20px; border-radius: 8px;
+            font-weight: 700; font-size: 15px; color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .algo-label.greedy { background: rgba(230, 126, 34, 0.9); }
+        .algo-label.astar  { background: rgba(52, 152, 219, 0.9); }
+
+        .stats-overlay {
+            position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; background: rgba(22, 33, 62, 0.92);
+            border-radius: 10px; padding: 12px 18px; color: white;
+            display: none; min-width: 200px;
+        }
+        .stats-overlay .stat-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+        .stats-overlay .stat-row .lbl { color: #aaa; }
+        .stats-overlay .stat-row .val { font-weight: 600; }
+
+        .live-counter {
+            position: absolute; bottom: 15px; right: 15px; z-index: 1000;
+            background: rgba(22, 33, 62, 0.85); border-radius: 8px;
+            padding: 6px 12px; color: white; font-size: 13px; display: none;
+        }
+        .live-counter span { font-weight: 700; }
+
+        .instructions-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 1000; background: rgba(22, 33, 62, 0.9); border-radius: 12px;
+            padding: 20px 30px; color: white; text-align: center;
+            font-size: 14px; line-height: 1.8; pointer-events: none;
         }
 
-        .map-label {
-            padding: 8px 14px;
-            font-weight: bold;
-            font-size: 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        /* ==================== EXPERIMENT VIEW ==================== */
+        .experiment-container {
+            display: none;
+            height: calc(100vh - 50px);
+            padding: 30px;
+            overflow-y: auto;
+            color: white;
         }
-        #label-greedy { background: #c0392b; }
-        #label-astar  { background: #2980b9; }
 
-        .stats {
+        .experiment-container h2 {
+            text-align: center; font-size: 22px; margin-bottom: 25px; font-weight: 300;
+        }
+        .experiment-container h2 span { font-weight: 700; }
+
+        .city-toggle {
+            display: flex; justify-content: center; gap: 10px; margin-bottom: 25px;
+        }
+        .city-btn {
+            padding: 10px 30px; border-radius: 8px; border: 2px solid #333;
+            background: transparent; color: #aaa; font-size: 14px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .city-btn.active { border-color: #4a90d9; color: white; background: #0f3460; }
+        .city-btn:hover { border-color: #4a90d9; }
+
+        .run-experiment-btn {
+            display: block; margin: 0 auto 30px; padding: 12px 40px;
+            border-radius: 8px; border: none; background: #27ae60;
+            color: white; font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .run-experiment-btn:hover { background: #2ecc71; }
+        .run-experiment-btn:disabled { background: #555; cursor: not-allowed; }
+
+        /* Results table */
+        .results-section { max-width: 900px; margin: 0 auto; }
+
+        table.results-table {
+            width: 100%; border-collapse: collapse; margin-bottom: 30px;
             font-size: 13px;
-            font-weight: normal;
-            color: rgba(255,255,255,0.85);
+        }
+        table.results-table th {
+            padding: 10px 12px; text-align: left; border-bottom: 2px solid #333;
+            color: #888; font-weight: 600; font-size: 12px; text-transform: uppercase;
+        }
+        table.results-table td {
+            padding: 8px 12px; border-bottom: 1px solid #222;
+        }
+        table.results-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+        .val-greedy { color: #e67e22; font-weight: 600; }
+        .val-astar  { color: #3498db; font-weight: 600; }
+        .val-diff   { color: #e74c3c; font-size: 12px; }
+        .val-better { color: #27ae60; }
+
+        /* Summary cards */
+        .summary-cards {
+            display: flex; gap: 20px; justify-content: center;
+            margin-bottom: 30px; flex-wrap: wrap;
+        }
+        .summary-card {
+            background: #16213e; border-radius: 12px; padding: 20px 30px;
+            text-align: center; min-width: 200px; flex: 1; max-width: 280px;
+        }
+        .summary-card .card-label { font-size: 12px; color: #888; text-transform: uppercase; margin-bottom: 8px; }
+        .summary-card .card-value { font-size: 28px; font-weight: 700; }
+        .summary-card .card-sub { font-size: 12px; color: #666; margin-top: 4px; }
+
+        .loading-spinner {
+            text-align: center; padding: 40px; font-size: 16px; color: #888;
         }
 
-        .map { flex: 1; min-height: 0; }
+        /* Compare section */
+        .compare-section {
+            max-width: 900px; margin: 40px auto 0; display: none;
+        }
+        .compare-section h3 { text-align: center; font-size: 18px; margin-bottom: 20px; font-weight: 300; }
+
+        .compare-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+        }
+        .compare-city {
+            background: #16213e; border-radius: 12px; padding: 20px;
+        }
+        .compare-city h4 { font-size: 15px; margin-bottom: 12px; color: #4a90d9; }
+        .compare-city .c-row {
+            display: flex; justify-content: space-between; font-size: 13px;
+            padding: 5px 0; border-bottom: 1px solid #1a1a3e;
+        }
+        .compare-city .c-row .c-lbl { color: #888; }
+        .compare-city .c-row .c-val { font-weight: 600; }
     </style>
 </head>
 <body>
 
-<header>
-    <h1>🗺 Search Algorithm Visualizer</h1>
-    <div class="controls">
-        <select id="citySelect">
-            <option value="baku">Baku, Azerbaijan</option>
-            <option value="tbilisi">Tbilisi, Georgia</option>
-        </select>
-        <span class="instruction" id="instruction">Click map to set START</span>
-        <button id="btnRun" onclick="runAlgorithms()">▶ Run</button>
-        <button id="btnClear" onclick="clearAll()">✕ Clear</button>
-    </div>
-</header>
+<!-- Top Control Bar -->
+<div class="topbar">
+    <h1>🔍 Search Algo Comparison</h1>
 
-<div class="maps-container">
+    <div class="tab-group">
+        <button class="tab-btn active" id="tabLive" onclick="switchTab('live')">Live Demo</button>
+        <button class="tab-btn" id="tabExperiment" onclick="switchTab('experiment')">Experiments</button>
+    </div>
+
+    <!-- Live demo controls -->
+    <span id="liveControls" style="display:flex; align-items:center; gap:20px;">
+    <span style="display:flex; align-items:center; gap:6px;">
+        <label>City:</label>
+        <select id="citySelect">
+            <option value="baku">Baku</option>
+            <option value="tbilisi">Tbilisi</option>
+        </select>
+    </span>
+
+    <span class="speed-group">
+        <label>Speed:</label>
+        <input type="range" id="speedSlider" min="0" max="3" step="1" value="2">
+        <span class="speed-text" id="speedLabel">Fast</span>
+    </span>
+
+    <button class="btn-run" id="runBtn" disabled>▶ Run Both</button>
+    <button class="btn-clear" id="clearBtn">✕ Clear</button>
+
+    <span class="status-text" id="status">Click map to set start point</span>
+    </span>
+</div>
+
+<!-- ==================== LIVE DEMO VIEW ==================== -->
+<div class="maps-container" id="liveView">
     <div class="map-panel">
-        <div class="map-label" id="label-greedy">
-            🔴 Greedy Best-First
-            <span class="stats" id="stats-greedy">—</span>
+        <div class="algo-label greedy">Greedy Best-First</div>
+        <div class="map" id="mapGreedy"></div>
+        <div class="live-counter" id="counterGreedy">Nodes: <span id="countGreedy">0</span></div>
+        <div class="stats-overlay" id="statsGreedy">
+            <div class="stat-row"><span class="lbl">Nodes Expanded</span><span class="val" id="sNodesGreedy">—</span>
+            </div>
+            <div class="stat-row"><span class="lbl">Path Length</span><span class="val" id="sLenGreedy">—</span></div>
+            <div class="stat-row"><span class="lbl">Time</span><span class="val" id="sTimeGreedy">—</span></div>
         </div>
-        <div class="map" id="map-greedy"></div>
     </div>
     <div class="map-panel">
-        <div class="map-label" id="label-astar">
-            🔵 A* Search
-            <span class="stats" id="stats-astar">—</span>
+        <div class="algo-label astar">A* Search</div>
+        <div class="map" id="mapAstar"></div>
+        <div class="live-counter" id="counterAstar">Nodes: <span id="countAstar">0</span></div>
+        <div class="stats-overlay" id="statsAstar">
+            <div class="stat-row"><span class="lbl">Nodes Expanded</span><span class="val" id="sNodesAstar">—</span>
+            </div>
+            <div class="stat-row"><span class="lbl">Path Length</span><span class="val" id="sLenAstar">—</span></div>
+            <div class="stat-row"><span class="lbl">Time</span><span class="val" id="sTimeAstar">—</span></div>
         </div>
-        <div class="map" id="map-astar"></div>
+    </div>
+</div>
+
+<div class="instructions-overlay" id="instrOverlay">
+    📍 Click anywhere on the map to set <strong>Start</strong><br>
+    then click again to set <strong>Goal</strong>
+</div>
+
+<!-- ==================== EXPERIMENT VIEW ==================== -->
+<div class="experiment-container" id="experimentView">
+    <h2>📊 Batch Experiment — <span id="expCityName">Baku</span></h2>
+
+    <div class="city-toggle">
+        <button class="city-btn active" id="expBaku" onclick="setExpCity('baku')">🇦🇿 Baku</button>
+        <button class="city-btn" id="expTbilisi" onclick="setExpCity('tbilisi')">🇬🇪 Tbilisi</button>
+        <button class="city-btn" id="expBoth" onclick="setExpCity('both')">⚡ Compare Both</button>
+    </div>
+
+    <button class="run-experiment-btn" id="runExpBtn" onclick="runExperiment()">▶ Run 5 Random Pairs</button>
+
+    <div id="expResults"></div>
+
+    <div class="compare-section" id="compareSection">
+        <h3>🏙️ Baku vs Tbilisi — Side by Side</h3>
+        <div class="compare-grid" id="compareGrid"></div>
     </div>
 </div>
 
 <script>
-    // --- State ---
-    let startLatLng = null, goalLatLng = null;
-    let startMarkers = [], goalMarkers = [], expandedLayers = [[], []], pathLayers = [null, null];
-    let activeStreams = [];
-
+    // ==================== CONFIG ====================
     const CITY_CENTERS = {
         baku:    [40.4093, 49.8671],
         tbilisi: [41.6938, 44.8015]
     };
+    const SPEED_DELAYS = [50, 15, 3, 0];
+    const SPEED_NAMES  = ['Slow', 'Medium', 'Fast', 'Instant'];
+    const COLORS = {
+        greedy: { explored: '#e67e22', path: '#d35400' },
+        astar:  { explored: '#3498db', path: '#2980b9' }
+    };
 
-    // --- Init two maps ---
-    const maps = [
-        L.map('map-greedy').setView(CITY_CENTERS.baku, 12),
-        L.map('map-astar').setView(CITY_CENTERS.baku, 12)
-    ];
+    // ==================== STATE ====================
+    let startLatLng = null, goalLatLng = null;
+    let startMarkers = [], goalMarkers = [];
+    let clickMode = 'start';
+    let isRunning = false;
+    let eventSources = [];
+    let layers = {
+        greedy: { explored: L.layerGroup(), path: L.layerGroup() },
+        astar:  { explored: L.layerGroup(), path: L.layerGroup() }
+    };
+    let expCity = 'baku';
+    let storedResults = {};  // store results for compare
 
-    maps.forEach(m => {
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap © CARTO'
-        }).addTo(m);
-    });
-
-    // Sync zoom and pan between both maps
-    function syncMaps(sourceIndex) {
-        const source = maps[sourceIndex];
-        const target = maps[1 - sourceIndex];
-        target.setView(source.getCenter(), source.getZoom(), { animate: false });
+    // ==================== TABS ====================
+    function switchTab(tab) {
+        if (tab === 'live') {
+            document.getElementById('liveView').style.display = 'flex';
+            document.getElementById('experimentView').style.display = 'none';
+            document.getElementById('instrOverlay').style.display = clickMode !== 'ready' ? 'block' : 'none';
+            document.getElementById('liveControls').style.display = '';
+            document.getElementById('tabLive').classList.add('active');
+            document.getElementById('tabExperiment').classList.remove('active');
+            mapGreedy.invalidateSize();
+            mapAstar.invalidateSize();
+        } else {
+            document.getElementById('liveView').style.display = 'none';
+            document.getElementById('experimentView').style.display = 'block';
+            document.getElementById('instrOverlay').style.display = 'none';
+            document.getElementById('liveControls').style.display = 'none';
+            document.getElementById('tabExperiment').classList.add('active');
+            document.getElementById('tabLive').classList.remove('active');
+        }
     }
-    maps[0].on('move', () => syncMaps(0));
-    maps[1].on('move', () => syncMaps(1));
 
-    // --- City switch ---
-    document.getElementById('citySelect').addEventListener('change', () => {
-        clearAll();
-        const center = CITY_CENTERS[document.getElementById('citySelect').value];
-        maps.forEach(m => m.setView(center, 12));
-    });
+    // ==================== INIT MAPS ====================
+    const city = document.getElementById('citySelect').value;
+    const center = CITY_CENTERS[city];
 
-    // --- Click to place markers ---
-    maps.forEach(m => {
-        m.on('click', e => {
-            if (activeStreams.length > 0) return; // ignore clicks while running
+    const mapGreedy = L.map('mapGreedy', { zoomControl: false }).setView(center, 13);
+    const mapAstar  = L.map('mapAstar',  { zoomControl: false }).setView(center, 13);
 
-            if (!startLatLng) {
-                startLatLng = e.latlng;
-                placeMarker(e.latlng, 'start');
-                setInstruction('Click map to set GOAL');
-            } else if (!goalLatLng) {
-                goalLatLng = e.latlng;
-                placeMarker(e.latlng, 'goal');
-                setInstruction('Ready! Press Run');
-                document.getElementById('btnRun').classList.add('ready');
-            }
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: ''
+    }).addTo(mapGreedy);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: ''
+    }).addTo(mapAstar);
+
+    layers.greedy.explored.addTo(mapGreedy);
+    layers.greedy.path.addTo(mapGreedy);
+    layers.astar.explored.addTo(mapAstar);
+    layers.astar.path.addTo(mapAstar);
+
+    // Sync maps
+    let syncing = false;
+    function syncMap(source, target) {
+        source.on('move', function() {
+            if (syncing) return;
+            syncing = true;
+            target.setView(source.getCenter(), source.getZoom(), { animate: false });
+            syncing = false;
         });
-    });
+    }
+    syncMap(mapGreedy, mapAstar);
+    syncMap(mapAstar, mapGreedy);
 
-    function placeMarker(latlng, type) {
-        const color = type === 'start' ? '#2ecc71' : '#e74c3c';
-        const label = type === 'start' ? 'S' : 'G';
-        const icon = L.divIcon({
+    // ==================== MARKERS ====================
+    function makeIcon(letter, color) {
+        return L.divIcon({
             className: '',
-            html: `<div style="background:${color};color:white;width:28px;height:28px;
-                   border-radius:50%;display:flex;align-items:center;justify-content:center;
-                   font-weight:bold;font-size:13px;border:2px solid white;
-                   box-shadow:0 2px 6px rgba(0,0,0,0.4)">${label}</div>`,
+            html: `<div style="background:${color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);">${letter}</div>`,
             iconSize: [28, 28], iconAnchor: [14, 14]
         });
-        maps.forEach(m => {
-            const marker = L.marker(latlng, { icon }).addTo(m);
-            if (type === 'start') startMarkers.push(marker);
-            else goalMarkers.push(marker);
-        });
     }
 
-    // --- Run algorithms ---
-    function runAlgorithms() {
-        if (!startLatLng || !goalLatLng) return;
-        document.getElementById('btnRun').classList.remove('ready');
-        setInstruction('Running...');
+    function placeMarker(latlng, letter, color) {
+        const m1 = L.marker(latlng, { icon: makeIcon(letter, color) }).addTo(mapGreedy);
+        const m2 = L.marker(latlng, { icon: makeIcon(letter, color) }).addTo(mapAstar);
+        return [m1, m2];
+    }
+
+    // ==================== MAP CLICK ====================
+    mapGreedy.on('click', handleMapClick);
+    mapAstar.on('click', handleMapClick);
+
+    function handleMapClick(e) {
+        if (isRunning) return;
+        if (clickMode === 'start') {
+            startMarkers.forEach(m => { mapGreedy.removeLayer(m); mapAstar.removeLayer(m); });
+            startLatLng = e.latlng;
+            startMarkers = placeMarker(e.latlng, 'S', '#27ae60');
+            clickMode = 'goal';
+            setStatus('Now click to set Goal point');
+            document.getElementById('instrOverlay').innerHTML = '📍 Now click to set <strong>Goal</strong>';
+        } else if (clickMode === 'goal') {
+            goalMarkers.forEach(m => { mapGreedy.removeLayer(m); mapAstar.removeLayer(m); });
+            goalLatLng = e.latlng;
+            goalMarkers = placeMarker(e.latlng, 'G', '#e74c3c');
+            clickMode = 'ready';
+            document.getElementById('runBtn').disabled = false;
+            setStatus('Ready — press Run Both!');
+            document.getElementById('instrOverlay').style.display = 'none';
+        }
+    }
+
+    // ==================== CITY SWITCH ====================
+    document.getElementById('citySelect').addEventListener('change', function() {
+        const c = CITY_CENTERS[this.value];
+        mapGreedy.setView(c, 13);
+        mapAstar.setView(c, 13);
+        clearAll();
+    });
+
+    // ==================== SPEED ====================
+    document.getElementById('speedSlider').addEventListener('input', function() {
+        document.getElementById('speedLabel').textContent = SPEED_NAMES[this.value];
+    });
+
+    // ==================== RUN BOTH (LIVE) ====================
+    document.getElementById('runBtn').addEventListener('click', function() {
+        if (!startLatLng || !goalLatLng || isRunning) return;
+        isRunning = true;
+        this.disabled = true;
+
+        layers.greedy.explored.clearLayers(); layers.greedy.path.clearLayers();
+        layers.astar.explored.clearLayers();  layers.astar.path.clearLayers();
+        document.getElementById('statsGreedy').style.display = 'none';
+        document.getElementById('statsAstar').style.display = 'none';
 
         const city = document.getElementById('citySelect').value;
-        const { lat: sLat, lng: sLon } = startLatLng;
-        const { lat: gLat, lng: gLon } = goalLatLng;
+        const speed = SPEED_DELAYS[document.getElementById('speedSlider').value];
+        setStatus('🔄 Searching...', true);
 
-        document.getElementById('stats-greedy').textContent = 'Running...';
-        document.getElementById('stats-astar').textContent  = 'Running...';
+        document.getElementById('counterGreedy').style.display = 'block';
+        document.getElementById('counterAstar').style.display = 'block';
+        document.getElementById('countGreedy').textContent = '0';
+        document.getElementById('countAstar').textContent = '0';
 
-        streamAlgo('greedy', 0, city, sLat, sLon, gLat, gLon);
-        streamAlgo('astar',  1, city, sLat, sLon, gLat, gLon);
+        const url = (algo) => `/stream/${algo}/${city}/${startLatLng.lat}/${startLatLng.lng}/${goalLatLng.lat}/${goalLatLng.lng}`;
+        let finished = 0;
+        const startTime = performance.now();
+
+        runStream('greedy', url('greedy'), speed, startTime, () => { finished++; checkDone(finished); });
+        runStream('astar',  url('astar'),  speed, startTime, () => { finished++; checkDone(finished); });
+    });
+
+    function checkDone(count) {
+        if (count >= 2) {
+            setStatus('✅ Both complete!', false, true);
+            isRunning = false;
+            document.getElementById('runBtn').disabled = false;
+        }
     }
 
-    function streamAlgo(algo, mapIndex, city, sLat, sLon, gLat, gLon) {
-        const url = `/stream/${algo}/${city}/${sLat}/${sLon}/${gLat}/${gLon}`;
+    function runStream(algo, url, delay, startTime, onDone) {
+        const colors = COLORS[algo];
+        const layerExplored = layers[algo].explored;
+        const layerPath = layers[algo].path;
+        const countEl = document.getElementById(algo === 'greedy' ? 'countGreedy' : 'countAstar');
+        let pendingNodes = [];
+        let nodeCount = 0;
+
         const es = new EventSource(url);
-        activeStreams.push(es);
+        eventSources.push(es);
 
-        let count = 0;
-        const statsEl = document.getElementById(`stats-${algo}`);
-        const map = maps[mapIndex];
-
-        es.onmessage = e => {
-            const data = JSON.parse(e.data);
-
+        es.onmessage = function(event) {
+            const data = JSON.parse(event.data);
             if (data.type === 'expand') {
-                count++;
-                // Draw expanded node as small circle
-                const circle = L.circleMarker([data.lat, data.lon], {
-                    radius: 3,
-                    color: algo === 'greedy' ? '#e74c3c' : '#3498db',
-                    fillOpacity: 0.5,
-                    weight: 0
-                }).addTo(map);
-                expandedLayers[mapIndex].push(circle);
-
-                if (count % 50 === 0) {
-                    statsEl.textContent = `Expanding... ${count} nodes`;
-                }
-
+                nodeCount++;
+                pendingNodes.push(data);
+                countEl.textContent = nodeCount;
             } else if (data.type === 'done') {
-                // Draw final path
-                const coords = data.path.map(p => [p.lat, p.lon]);
-                const pathLine = L.polyline(coords, {
-                    color: algo === 'greedy' ? '#ff6b6b' : '#74b9ff',
-                    weight: 5,
-                    opacity: 0.9
-                }).addTo(map);
-                pathLayers[mapIndex] = pathLine;
-                map.fitBounds(pathLine.getBounds(), { padding: [40, 40] });
-
-                statsEl.textContent = `✅ ${(data.path_length/1000).toFixed(1)}km | ${data.nodes_expanded.toLocaleString()} nodes expanded`;
-                setInstruction('Done! Clear to run again.');
                 es.close();
-                activeStreams = activeStreams.filter(s => s !== es);
-
+                drawNodesAnimated(pendingNodes, 0, delay, colors.explored, layerExplored, countEl, function() {
+                    drawPathAnimated(data.path, colors.path, layerPath, function() {
+                        const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+                        showStatsFor(algo, data.nodes_expanded, data.path_length, elapsed);
+                        onDone();
+                    });
+                });
+                pendingNodes = [];
             } else if (data.type === 'no_path') {
-                statsEl.textContent = '❌ No path found';
-                es.close();
-                activeStreams = activeStreams.filter(s => s !== es);
+                es.close(); onDone();
             }
         };
-
-        es.onerror = () => {
-            es.close();
-            activeStreams = activeStreams.filter(s => s !== es);
-        };
+        es.onerror = function() { es.close(); onDone(); };
     }
 
-    // --- Clear ---
+    // ==================== ANIMATED DRAWING ====================
+    function drawNodesAnimated(nodes, startIdx, delay, color, layer, countEl, callback) {
+        if (delay === 0) {
+            for (let i = startIdx; i < nodes.length; i++) {
+                const n = nodes[i];
+                L.circleMarker([n.lat, n.lon], { radius: 2, color, fillColor: color, fillOpacity: 0.5, weight: 0 }).addTo(layer);
+            }
+            if (callback) callback();
+            return;
+        }
+        let i = startIdx;
+        const batchSize = Math.max(1, Math.floor(10 / (delay || 1)));
+        function drawBatch() {
+            const end = Math.min(i + batchSize, nodes.length);
+            for (; i < end; i++) {
+                const n = nodes[i];
+                L.circleMarker([n.lat, n.lon], { radius: 2, color, fillColor: color, fillOpacity: 0.5, weight: 0 }).addTo(layer);
+            }
+            countEl.textContent = i;
+            if (i < nodes.length) setTimeout(drawBatch, delay);
+            else if (callback) callback();
+        }
+        drawBatch();
+    }
+
+    function drawPathAnimated(pathCoords, color, layer, callback) {
+        const latlngs = pathCoords.map(p => [p.lat, p.lon]);
+        if (latlngs.length === 0) { if (callback) callback(); return; }
+        let i = 1;
+        function drawSegment() {
+            if (i >= latlngs.length) { if (callback) callback(); return; }
+            L.polyline([latlngs[i-1], latlngs[i]], { color, weight: 5, opacity: 0.9 }).addTo(layer);
+            i++;
+            setTimeout(drawSegment, 15);
+        }
+        drawSegment();
+    }
+
+    function showStatsFor(algo, nodes, length, time) {
+        if (algo === 'greedy') {
+            document.getElementById('sNodesGreedy').textContent = nodes.toLocaleString();
+            document.getElementById('sLenGreedy').textContent = (length / 1000).toFixed(2) + ' km';
+            document.getElementById('sTimeGreedy').textContent = time + 's';
+            document.getElementById('statsGreedy').style.display = 'block';
+            document.getElementById('counterGreedy').style.display = 'none';
+        } else {
+            document.getElementById('sNodesAstar').textContent = nodes.toLocaleString();
+            document.getElementById('sLenAstar').textContent = (length / 1000).toFixed(2) + ' km';
+            document.getElementById('sTimeAstar').textContent = time + 's';
+            document.getElementById('statsAstar').style.display = 'block';
+            document.getElementById('counterAstar').style.display = 'none';
+        }
+    }
+
+    // ==================== CLEAR ====================
+    document.getElementById('clearBtn').addEventListener('click', clearAll);
+
     function clearAll() {
-        activeStreams.forEach(s => s.close());
-        activeStreams = [];
-        startLatLng = null; goalLatLng = null;
-        startMarkers.forEach(m => { maps[0].removeLayer(m); maps[1].removeLayer(m); });
-        goalMarkers.forEach(m =>  { maps[0].removeLayer(m); maps[1].removeLayer(m); });
+        eventSources.forEach(es => es.close());
+        eventSources = [];
+        layers.greedy.explored.clearLayers(); layers.greedy.path.clearLayers();
+        layers.astar.explored.clearLayers();  layers.astar.path.clearLayers();
+        startMarkers.forEach(m => { mapGreedy.removeLayer(m); mapAstar.removeLayer(m); });
+        goalMarkers.forEach(m => { mapGreedy.removeLayer(m); mapAstar.removeLayer(m); });
         startMarkers = []; goalMarkers = [];
-        expandedLayers.forEach((layers, i) => {
-            layers.forEach(l => maps[i].removeLayer(l));
-            expandedLayers[i] = [];
-        });
-        pathLayers.forEach((l, i) => { if (l) maps[i].removeLayer(l); });
-        pathLayers = [null, null];
-        document.getElementById('stats-greedy').textContent = '—';
-        document.getElementById('stats-astar').textContent  = '—';
-        document.getElementById('btnRun').classList.remove('ready');
-        setInstruction('Click map to set START');
+        startLatLng = null; goalLatLng = null;
+        clickMode = 'start'; isRunning = false;
+        document.getElementById('runBtn').disabled = true;
+        document.getElementById('statsGreedy').style.display = 'none';
+        document.getElementById('statsAstar').style.display = 'none';
+        document.getElementById('counterGreedy').style.display = 'none';
+        document.getElementById('counterAstar').style.display = 'none';
+        document.getElementById('instrOverlay').style.display = 'block';
+        document.getElementById('instrOverlay').innerHTML = '📍 Click anywhere on the map to set <strong>Start</strong><br>then click again to set <strong>Goal</strong>';
+        setStatus('Click map to set start point');
     }
 
-    function setInstruction(text) {
-        document.getElementById('instruction').textContent = text;
+    function setStatus(msg, searching, done) {
+        const el = document.getElementById('status');
+        el.textContent = msg;
+        el.className = 'status-text' + (done ? ' done' : '');
+    }
+
+    // ==================== EXPERIMENT TAB ====================
+    function setExpCity(c) {
+        expCity = c;
+        document.getElementById('expBaku').classList.toggle('active', c === 'baku');
+        document.getElementById('expTbilisi').classList.toggle('active', c === 'tbilisi');
+        document.getElementById('expBoth').classList.toggle('active', c === 'both');
+        document.getElementById('expCityName').textContent =
+            c === 'baku' ? 'Baku' : c === 'tbilisi' ? 'Tbilisi' : 'Baku vs Tbilisi';
+    }
+
+    async function runExperiment() {
+        const btn = document.getElementById('runExpBtn');
+        const resultsDiv = document.getElementById('expResults');
+        btn.disabled = true;
+        btn.textContent = '⏳ Running...';
+        resultsDiv.innerHTML = '<div class="loading-spinner">Running algorithms on random pairs...</div>';
+        document.getElementById('compareSection').style.display = 'none';
+
+        if (expCity === 'both') {
+            // Run both cities
+            const [bakuData, tbilisiData] = await Promise.all([
+                fetch('/experiment/baku/5').then(r => r.json()),
+                fetch('/experiment/tbilisi/5').then(r => r.json())
+            ]);
+            storedResults.baku = bakuData;
+            storedResults.tbilisi = tbilisiData;
+            resultsDiv.innerHTML = renderCityResults(bakuData, '🇦🇿 Baku') + renderCityResults(tbilisiData, '🇬🇪 Tbilisi');
+            renderCompare(bakuData, tbilisiData);
+        } else {
+            const data = await fetch(`/experiment/${expCity}/5`).then(r => r.json());
+            storedResults[expCity] = data;
+            resultsDiv.innerHTML = renderCityResults(data, expCity === 'baku' ? '🇦🇿 Baku' : '🇬🇪 Tbilisi');
+
+            // If we have both, show compare
+            if (storedResults.baku && storedResults.tbilisi) {
+                renderCompare(storedResults.baku, storedResults.tbilisi);
+            }
+        }
+
+        btn.disabled = false;
+        btn.textContent = '▶ Run 5 Random Pairs';
+    }
+
+    function renderCityResults(data, label) {
+        const avg = data.averages;
+        const greedyError = ((avg.greedy_length / avg.astar_length - 1) * 100).toFixed(1);
+
+        let html = `
+        <div class="results-section">
+            <h2 style="margin-top:20px">${label}</h2>
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="card-label">Greedy Avg Nodes</div>
+                    <div class="card-value val-greedy">${avg.greedy_nodes.toLocaleString()}</div>
+                    <div class="card-sub">expanded</div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-label">A* Avg Nodes</div>
+                    <div class="card-value val-astar">${avg.astar_nodes.toLocaleString()}</div>
+                    <div class="card-sub">expanded</div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-label">Greedy Path Error</div>
+                    <div class="card-value" style="color:#e74c3c">+${greedyError}%</div>
+                    <div class="card-sub">longer than A*</div>
+                </div>
+            </div>
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Pair</th>
+                        <th>Greedy Nodes</th>
+                        <th>A* Nodes</th>
+                        <th>Greedy Path</th>
+                        <th>A* Path</th>
+                        <th>Greedy Error</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        for (const r of data.results) {
+            const err = ((r.greedy_length / r.astar_length - 1) * 100).toFixed(1);
+            html += `
+                <tr>
+                    <td>#${r.pair}</td>
+                    <td class="val-greedy">${r.greedy_nodes.toLocaleString()}</td>
+                    <td class="val-astar">${r.astar_nodes.toLocaleString()}</td>
+                    <td class="val-greedy">${(r.greedy_length/1000).toFixed(2)} km</td>
+                    <td class="val-astar">${(r.astar_length/1000).toFixed(2)} km</td>
+                    <td class="val-diff">+${err}%</td>
+                </tr>`;
+        }
+
+        html += `</tbody></table></div>`;
+        return html;
+    }
+
+    function renderCompare(bakuData, tbilisiData) {
+        const b = bakuData.averages;
+        const t = tbilisiData.averages;
+        const bErr = ((b.greedy_length / b.astar_length - 1) * 100).toFixed(1);
+        const tErr = ((t.greedy_length / t.astar_length - 1) * 100).toFixed(1);
+
+        document.getElementById('compareGrid').innerHTML = `
+            <div class="compare-city">
+                <h4>🇦🇿 Baku (Flat / Unconstrained)</h4>
+                <div class="c-row"><span class="c-lbl">Network Size</span><span class="c-val">73,192 nodes</span></div>
+                <div class="c-row"><span class="c-lbl">Greedy Avg Nodes</span><span class="c-val val-greedy">${b.greedy_nodes.toLocaleString()}</span></div>
+                <div class="c-row"><span class="c-lbl">A* Avg Nodes</span><span class="c-val val-astar">${b.astar_nodes.toLocaleString()}</span></div>
+                <div class="c-row"><span class="c-lbl">Greedy Avg Path</span><span class="c-val val-greedy">${(b.greedy_length/1000).toFixed(2)} km</span></div>
+                <div class="c-row"><span class="c-lbl">A* Avg Path</span><span class="c-val val-astar">${(b.astar_length/1000).toFixed(2)} km</span></div>
+                <div class="c-row"><span class="c-lbl">Greedy Error</span><span class="c-val" style="color:#e74c3c">+${bErr}%</span></div>
+            </div>
+            <div class="compare-city">
+                <h4>🇬🇪 Tbilisi (River / Constrained)</h4>
+                <div class="c-row"><span class="c-lbl">Network Size</span><span class="c-val">14,108 nodes</span></div>
+                <div class="c-row"><span class="c-lbl">Greedy Avg Nodes</span><span class="c-val val-greedy">${t.greedy_nodes.toLocaleString()}</span></div>
+                <div class="c-row"><span class="c-lbl">A* Avg Nodes</span><span class="c-val val-astar">${t.astar_nodes.toLocaleString()}</span></div>
+                <div class="c-row"><span class="c-lbl">Greedy Avg Path</span><span class="c-val val-greedy">${(t.greedy_length/1000).toFixed(2)} km</span></div>
+                <div class="c-row"><span class="c-lbl">A* Avg Path</span><span class="c-val val-astar">${(t.astar_length/1000).toFixed(2)} km</span></div>
+                <div class="c-row"><span class="c-lbl">Greedy Error</span><span class="c-val" style="color:#e74c3c">+${tErr}%</span></div>
+            </div>
+        `;
+        document.getElementById('compareSection').style.display = 'block';
     }
 </script>
+
 </body>
 </html>

@@ -1,11 +1,13 @@
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, jsonify, Response
+from search_algorithms import greedy_best_first_search, astar_search, greedy_stream, astar_stream
 import osmnx as ox
 import json
-import math
+import random
+import time
 
 app = Flask(__name__)
 
-# Load graphs once at startup — like a @PostConstruct in Spring Boot
+# Load graphs once at startup
 print("Loading graphs...")
 GRAPHS = {
     "baku": ox.load_graphml("graphs/baku.graphml"),
@@ -18,80 +20,8 @@ CITY_CENTERS = {
     "tbilisi": [41.6938, 44.8015]
 }
 
-def haversine(node1_data, node2_data):
-    lat1, lon1 = math.radians(node1_data['y']), math.radians(node1_data['x'])
-    lat2, lon2 = math.radians(node2_data['y']), math.radians(node2_data['x'])
-    dlat, dlon = lat2 - lat1, lon2 - lon1
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    return 6371000 * 2 * math.asin(math.sqrt(a))
-
 def get_nearest_node(graph, lat, lon):
     return ox.distance.nearest_nodes(graph, lon, lat)
-
-def greedy_steps(graph, start, goal):
-    """Yields each step so we can stream it to the frontend"""
-    import heapq
-    goal_data = graph.nodes[goal]
-    frontier = [(0, start, [start])]
-    visited = set()
-
-    while frontier:
-        _, current, path = heapq.heappop(frontier)
-        if current in visited:
-            continue
-        visited.add(current)
-
-        # Yield this expansion step
-        node_data = graph.nodes[current]
-        yield {'type': 'expand', 'lat': node_data['y'], 'lon': node_data['x']}
-
-        if current == goal:
-            coords = [{'lat': graph.nodes[n]['y'], 'lon': graph.nodes[n]['x']} for n in path]
-            total_length = sum(
-                graph[path[i]][path[i+1]][0].get('length', 0)
-                for i in range(len(path) - 1)
-            )
-            yield {'type': 'done', 'path': coords,
-                   'nodes_expanded': len(visited), 'path_length': round(total_length)}
-            return
-
-        for neighbor in graph.neighbors(current):
-            if neighbor not in visited:
-                h = haversine(graph.nodes[neighbor], goal_data)
-                heapq.heappush(frontier, (h, neighbor, path + [neighbor]))
-
-    yield {'type': 'no_path'}
-
-def astar_steps(graph, start, goal):
-    """Yields each step so we can stream it to the frontend"""
-    import heapq
-    goal_data = graph.nodes[goal]
-    start_h = haversine(graph.nodes[start], goal_data)
-    frontier = [(start_h, start, 0, [start])]
-    visited = {}
-
-    while frontier:
-        f, current, g, path = heapq.heappop(frontier)
-        if current in visited and visited[current] <= g:
-            continue
-        visited[current] = g
-
-        node_data = graph.nodes[current]
-        yield {'type': 'expand', 'lat': node_data['y'], 'lon': node_data['x']}
-
-        if current == goal:
-            coords = [{'lat': graph.nodes[n]['y'], 'lon': graph.nodes[n]['x']} for n in path]
-            yield {'type': 'done', 'path': coords,
-                   'nodes_expanded': len(visited), 'path_length': round(g)}
-            return
-
-        for neighbor in graph.neighbors(current):
-            edge_length = graph[current][neighbor][0].get('length', 0)
-            new_g = g + edge_length
-            h = haversine(graph.nodes[neighbor], goal_data)
-            heapq.heappush(frontier, (new_g + h, neighbor, new_g, path + [neighbor]))
-
-    yield {'type': 'no_path'}
 
 @app.route('/')
 def index():
@@ -103,7 +33,7 @@ def stream(algo, city, start_lat, start_lon, goal_lat, goal_lon):
     start = get_nearest_node(graph, start_lat, start_lon)
     goal  = get_nearest_node(graph, goal_lat,  goal_lon)
 
-    algo_fn = greedy_steps if algo == 'greedy' else astar_steps
+    algo_fn = greedy_stream if algo == 'greedy' else astar_stream
 
     def generate():
         for step in algo_fn(graph, start, goal):
@@ -114,6 +44,52 @@ def stream(algo, city, start_lat, start_lon, goal_lat, goal_lon):
 @app.route('/cities')
 def cities():
     return jsonify(CITY_CENTERS)
+
+@app.route('/experiment/<city>/<int:num_pairs>')
+def experiment(city, num_pairs):
+    graph = GRAPHS[city]
+    nodes = list(graph.nodes)
+    results = []
+
+    for i in range(num_pairs):
+        start, goal = random.sample(nodes, 2)
+
+        t0 = time.time()
+        greedy = greedy_best_first_search(graph, start, goal)
+        greedy_time = time.time() - t0
+
+        t0 = time.time()
+        astar = astar_search(graph, start, goal)
+        astar_time = time.time() - t0
+
+        if greedy['found'] and astar['found']:
+            start_coords = {'lat': graph.nodes[start]['y'], 'lon': graph.nodes[start]['x']}
+            goal_coords  = {'lat': graph.nodes[goal]['y'],  'lon': graph.nodes[goal]['x']}
+            results.append({
+                'pair': i + 1,
+                'start': start_coords,
+                'goal': goal_coords,
+                'greedy_nodes': greedy['nodes_expanded'],
+                'greedy_length': round(greedy['path_length'], 1),
+                'greedy_time': round(greedy_time * 1000, 1),
+                'astar_nodes': astar['nodes_expanded'],
+                'astar_length': round(astar['path_length'], 1),
+                'astar_time': round(astar_time * 1000, 1),
+            })
+
+    if results:
+        avg = {
+            'greedy_nodes': round(sum(r['greedy_nodes'] for r in results) / len(results)),
+            'greedy_length': round(sum(r['greedy_length'] for r in results) / len(results), 1),
+            'greedy_time': round(sum(r['greedy_time'] for r in results) / len(results), 1),
+            'astar_nodes': round(sum(r['astar_nodes'] for r in results) / len(results)),
+            'astar_length': round(sum(r['astar_length'] for r in results) / len(results), 1),
+            'astar_time': round(sum(r['astar_time'] for r in results) / len(results), 1),
+        }
+    else:
+        avg = {}
+
+    return jsonify({'results': results, 'averages': avg, 'city': city})
 
 if __name__ == '__main__':
     app.run(debug=True)

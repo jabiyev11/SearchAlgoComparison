@@ -110,7 +110,7 @@ random.sample(tbilisi_nodes, 2)  # skip pair 1
 random.sample(tbilisi_nodes, 2)  # skip pair 2
 tbilisi_pair = random.sample(tbilisi_nodes, 2)  # pair 3
 
-visualize_comparison(baku,    "Baku, Azerbaijan", baku_pair[0],    baku_pair[1],    "baku_map.html")
-visualize_comparison(tbilisi, "Tbilisi, Georgia", tbilisi_pair[0], tbilisi_pair[1], "tbilisi_map.html")
+visualize_comparison(baku,    "Baku, Azerbaijan", baku_pair[0], baku_pair[1], "static/baku_map.html")
+visualize_comparison(tbilisi, "Tbilisi, Georgia", tbilisi_pair[0], tbilisi_pair[1], "static/tbilisi_map.html")
 
 print("\nDone! Open baku_map.html and tbilisi_map.html in your browser 🗺️")
