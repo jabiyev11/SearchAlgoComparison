@@ -8,10 +8,8 @@ baku = ox.load_graphml("graphs/baku.graphml")
 tbilisi = ox.load_graphml("graphs/tbilisi.graphml")
 print("Loaded! ✅\n")
 
-def run_experiment(graph, city_name, num_pairs=5):
-    """
-    Runs both algorithms on random origin-destination pairs and compares results.
-    """
+def run_experiment(graph, city_name, num_pairs=100):
+
     print(f"{'='*50}")
     print(f"  {city_name}")
     print(f"{'='*50}")
@@ -63,6 +61,6 @@ def run_experiment(graph, city_name, num_pairs=5):
     return results
 
 # Run experiments
-random.seed(42)  # makes results reproducible — like Java's new Random(42)
+random.seed(42)
 baku_results    = run_experiment(baku,    "Baku, Azerbaijan")
 tbilisi_results = run_experiment(tbilisi, "Tbilisi, Georgia")

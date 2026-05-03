@@ -69,7 +69,6 @@
         .status-text { font-size: 13px; color: #e67e22; min-width: 120px; text-align: center; }
         .status-text.done { color: #27ae60; }
 
-        /* ==================== LIVE DEMO VIEW ==================== */
         .maps-container {
             display: flex;
             height: calc(100vh - 50px);
@@ -112,7 +111,6 @@
             font-size: 14px; line-height: 1.8; pointer-events: none;
         }
 
-        /* ==================== EXPERIMENT VIEW ==================== */
         .experiment-container {
             display: none;
             height: calc(100vh - 50px);
@@ -239,7 +237,6 @@
     </span>
 </div>
 
-<!-- ==================== LIVE DEMO VIEW ==================== -->
 <div class="maps-container" id="liveView">
     <div class="map-panel">
         <div class="algo-label greedy">Greedy Best-First</div>
@@ -270,7 +267,6 @@
     then click again to set <strong>Goal</strong>
 </div>
 
-<!-- ==================== EXPERIMENT VIEW ==================== -->
 <div class="experiment-container" id="experimentView">
     <h2>📊 Batch Experiment — <span id="expCityName">Baku</span></h2>
 
@@ -280,7 +276,7 @@
         <button class="city-btn" id="expBoth" onclick="setExpCity('both')">⚡ Compare Both</button>
     </div>
 
-    <button class="run-experiment-btn" id="runExpBtn" onclick="runExperiment()">▶ Run 5 Random Pairs</button>
+    <button class="run-experiment-btn" id="runExpBtn" onclick="runExperiment()">▶ Run 20 Random Pairs</button>
 
     <div id="expResults"></div>
 
@@ -291,7 +287,6 @@
 </div>
 
 <script>
-    // ==================== CONFIG ====================
     const CITY_CENTERS = {
         baku:    [40.4093, 49.8671],
         tbilisi: [41.6938, 44.8015]
@@ -303,7 +298,6 @@
         astar:  { explored: '#3498db', path: '#2980b9' }
     };
 
-    // ==================== STATE ====================
     let startLatLng = null, goalLatLng = null;
     let startMarkers = [], goalMarkers = [];
     let clickMode = 'start';
@@ -316,7 +310,6 @@
     let expCity = 'baku';
     let storedResults = {};  // store results for compare
 
-    // ==================== TABS ====================
     function switchTab(tab) {
         if (tab === 'live') {
             document.getElementById('liveView').style.display = 'flex';
@@ -337,7 +330,6 @@
         }
     }
 
-    // ==================== INIT MAPS ====================
     const city = document.getElementById('citySelect').value;
     const center = CITY_CENTERS[city];
 
@@ -369,7 +361,6 @@
     syncMap(mapGreedy, mapAstar);
     syncMap(mapAstar, mapGreedy);
 
-    // ==================== MARKERS ====================
     function makeIcon(letter, color) {
         return L.divIcon({
             className: '',
@@ -384,7 +375,6 @@
         return [m1, m2];
     }
 
-    // ==================== MAP CLICK ====================
     mapGreedy.on('click', handleMapClick);
     mapAstar.on('click', handleMapClick);
 
@@ -408,7 +398,6 @@
         }
     }
 
-    // ==================== CITY SWITCH ====================
     document.getElementById('citySelect').addEventListener('change', function() {
         const c = CITY_CENTERS[this.value];
         mapGreedy.setView(c, 13);
@@ -416,12 +405,10 @@
         clearAll();
     });
 
-    // ==================== SPEED ====================
     document.getElementById('speedSlider').addEventListener('input', function() {
         document.getElementById('speedLabel').textContent = SPEED_NAMES[this.value];
     });
 
-    // ==================== RUN BOTH (LIVE) ====================
     document.getElementById('runBtn').addEventListener('click', function() {
         if (!startLatLng || !goalLatLng || isRunning) return;
         isRunning = true;
@@ -491,7 +478,6 @@
         es.onerror = function() { es.close(); onDone(); };
     }
 
-    // ==================== ANIMATED DRAWING ====================
     function drawNodesAnimated(nodes, startIdx, delay, color, layer, countEl, callback) {
         if (delay === 0) {
             for (let i = startIdx; i < nodes.length; i++) {
@@ -545,7 +531,6 @@
         }
     }
 
-    // ==================== CLEAR ====================
     document.getElementById('clearBtn').addEventListener('click', clearAll);
 
     function clearAll() {
@@ -574,7 +559,6 @@
         el.className = 'status-text' + (done ? ' done' : '');
     }
 
-    // ==================== EXPERIMENT TAB ====================
     function setExpCity(c) {
         expCity = c;
         document.getElementById('expBaku').classList.toggle('active', c === 'baku');
@@ -595,15 +579,15 @@
         if (expCity === 'both') {
             // Run both cities
             const [bakuData, tbilisiData] = await Promise.all([
-                fetch('/experiment/baku/5').then(r => r.json()),
-                fetch('/experiment/tbilisi/5').then(r => r.json())
+                fetch('/experiment/baku/20').then(r => r.json()),
+                fetch('/experiment/tbilisi/20').then(r => r.json())
             ]);
             storedResults.baku = bakuData;
             storedResults.tbilisi = tbilisiData;
             resultsDiv.innerHTML = renderCityResults(bakuData, '🇦🇿 Baku') + renderCityResults(tbilisiData, '🇬🇪 Tbilisi');
             renderCompare(bakuData, tbilisiData);
         } else {
-            const data = await fetch(`/experiment/${expCity}/5`).then(r => r.json());
+            const data = await fetch(`/experiment/${expCity}/20`).then(r => r.json());
             storedResults[expCity] = data;
             resultsDiv.innerHTML = renderCityResults(data, expCity === 'baku' ? '🇦🇿 Baku' : '🇬🇪 Tbilisi');
 
@@ -614,7 +598,7 @@
         }
 
         btn.disabled = false;
-        btn.textContent = '▶ Run 5 Random Pairs';
+        btn.textContent = '▶ Run 20 Random Pairs';
     }
 
     function renderCityResults(data, label) {
